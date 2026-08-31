@@ -1,13 +1,1 @@
-[
-  {
-    "id": "unit-101-ac",
-    "building_name": "Tower A",
-    "unit_number": "Flat 101",
-    "tenant_name": "John Doe",
-    "service_type": "AC Service",
-    "first_service_date": "2026-03-09",
-    "last_service_date": "2026-06-07",
-    "next_due_date": "2026-09-07",
-    "status": "Upcoming"
-  }
-]
+[]
