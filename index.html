@@ -7,39 +7,56 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 p-6 md:p-10 text-slate-800 font-sans">
-  <div class="max-w-5xl mx-auto space-y-6">
+  <div class="max-w-7xl mx-auto space-y-6">
     <header class="border-b border-slate-200 pb-4">
       <h1 class="text-2xl font-bold text-slate-900">Apartment Maintenance Console</h1>
-      <p class="text-sm text-slate-500">Self-Hosted 3-Month Recurring Cycle Tracker (AC, RO, Pest Control)</p>
+      <p class="text-sm text-slate-500">Track Tenant, Building, First, Last, and Next Due Dates</p>
     </header>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <!-- Add Flat Form -->
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <h2 class="font-semibold text-lg mb-3">Add Serviced Apartment</h2>
-        <form id="addAptForm" class="space-y-3">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Add Service Form -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <h2 class="font-semibold text-lg text-slate-900">Add Service Schedule</h2>
+        <form id="addServiceForm" class="space-y-3">
           <div>
-            <label class="text-xs text-slate-600 font-medium">Flat / Unit Number</label>
+            <label class="text-xs text-slate-600 font-semibold">Building Name</label>
+            <input id="buildingName" type="text" placeholder="e.g. Tower A / Sunset Heights" required class="w-full p-2 border rounded text-sm mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-slate-600 font-semibold">Flat / Unit Number</label>
             <input id="unitNumber" type="text" placeholder="e.g. Flat 302" required class="w-full p-2 border rounded text-sm mt-1">
           </div>
           <div>
-            <label class="text-xs text-slate-600 font-medium">Building / Tower</label>
-            <input id="buildingName" type="text" placeholder="e.g. Tower A" class="w-full p-2 border rounded text-sm mt-1">
+            <label class="text-xs text-slate-600 font-semibold">Tenant Name</label>
+            <input id="tenantName" type="text" placeholder="e.g. John Doe" required class="w-full p-2 border rounded text-sm mt-1">
           </div>
           <div>
-            <label class="text-xs text-slate-600 font-medium">Last Service Date (Base Date)</label>
-            <input id="startDate" type="date" required class="w-full p-2 border rounded text-sm mt-1">
+            <label class="text-xs text-slate-600 font-semibold">Service Type</label>
+            <select id="serviceType" class="w-full p-2 border rounded text-sm mt-1">
+              <option value="AC Service">AC Service</option>
+              <option value="RO Service">RO Service</option>
+              <option value="Pest Control">Pest Control</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-slate-600 font-semibold">First Service Done On</label>
+            <input id="firstDate" type="date" required class="w-full p-2 border rounded text-sm mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-slate-600 font-semibold">Last Service Done On</label>
+            <input id="lastDate" type="date" required class="w-full p-2 border rounded text-sm mt-1">
+            <p class="text-[11px] text-slate-400 mt-0.5">Next due date will auto-set to +90 days.</p>
           </div>
           <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded text-sm font-medium hover:bg-slate-800 transition">
-            Add Unit (+90d Cycles)
+            Add Service Record
           </button>
         </form>
       </div>
 
-      <!-- Schedule Table -->
-      <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
+      <!-- Schedules Table -->
+      <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
         <div class="flex justify-between items-center mb-3">
-          <h2 class="font-semibold text-lg">Scheduled Services</h2>
+          <h2 class="font-semibold text-lg">Maintenance Schedules</h2>
           <button id="downloadBtn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded border">
             📥 Save / Download data.json
           </button>
@@ -49,8 +66,10 @@
           <table class="w-full text-left text-sm">
             <thead>
               <tr class="border-b bg-slate-50 text-slate-600">
-                <th class="p-2">Unit</th>
+                <th class="p-2">Property & Tenant</th>
                 <th class="p-2">Service</th>
+                <th class="p-2">First Done</th>
+                <th class="p-2">Last Done</th>
                 <th class="p-2">Next Due</th>
                 <th class="p-2">Action</th>
               </tr>
@@ -67,7 +86,6 @@
   <script>
     let serviceRecords = [];
 
-    // Load data from repository's data.json
     async function loadData() {
       try {
         const response = await fetch('./data.json');
@@ -81,20 +99,22 @@
     function renderTable() {
       const tbody = document.getElementById('servicesList');
       if (!serviceRecords.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">No schedules found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">No schedules recorded yet.</td></tr>';
         return;
       }
 
       tbody.innerHTML = serviceRecords.map((item, index) => `
         <tr class="border-b hover:bg-slate-50">
-          <td class="p-2 font-medium">
-            ${item.unit_number} 
-            <span class="text-xs text-slate-400 block">${item.building_name || ''}</span>
+          <td class="p-2">
+            <span class="font-semibold text-slate-900">${item.building_name} — ${item.unit_number}</span>
+            <span class="text-xs text-slate-500 block">👤 ${item.tenant_name || 'No tenant specified'}</span>
           </td>
           <td class="p-2 font-medium text-slate-700">${item.service_type}</td>
-          <td class="p-2 font-mono text-xs">${item.next_due_date}</td>
+          <td class="p-2 font-mono text-xs text-slate-500">${item.first_service_date || '-'}</td>
+          <td class="p-2 font-mono text-xs text-slate-500">${item.last_service_date}</td>
+          <td class="p-2 font-mono text-xs font-semibold text-blue-600">${item.next_due_date}</td>
           <td class="p-2">
-            <button onclick="markDone(${index})" class="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-2 py-1 rounded hover:bg-blue-100">
+            <button onclick="markDone(${index})" class="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-2.5 py-1 rounded hover:bg-blue-100 font-medium">
               Mark Done (+90d)
             </button>
           </td>
@@ -102,51 +122,56 @@
       `).join('');
     }
 
-    // Add Flat & Auto-generate 3 services
-    document.getElementById('addAptForm').addEventListener('submit', (e) => {
+    // Add Service Entry
+    document.getElementById('addServiceForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      const unit = document.getElementById('unitNumber').value;
       const building = document.getElementById('buildingName').value;
-      const startDate = document.getElementById('startDate').value;
+      const unit = document.getElementById('unitNumber').value;
+      const tenant = document.getElementById('tenantName').value;
+      const type = document.getElementById('serviceType').value;
+      const first = document.getElementById('firstDate').value;
+      const last = document.getElementById('lastDate').value;
 
-      const baseDate = new Date(startDate);
-      const nextDate = new Date(baseDate);
-      nextDate.setDate(nextDate.getDate() + 90);
-      const nextDueDateStr = nextDate.toISOString().split('T')[0];
+      // Calculate next due date (90 days from last service)
+      const lastDateObj = new Date(last);
+      const nextDateObj = new Date(lastDateObj);
+      nextDateObj.setDate(nextDateObj.getDate() + 90);
+      const nextDueDateStr = nextDateObj.toISOString().split('T')[0];
 
-      const services = ['AC Service', 'RO Service', 'Pest Control'];
-      services.forEach((srv) => {
-        serviceRecords.push({
-          id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-          unit_number: unit,
-          building_name: building,
-          service_type: srv,
-          last_service_date: startDate,
-          next_due_date: nextDueDateStr,
-          status: 'Upcoming'
-        });
+      serviceRecords.push({
+        id: Date.now().toString(),
+        building_name: building,
+        unit_number: unit,
+        tenant_name: tenant,
+        service_type: type,
+        first_service_date: first,
+        last_service_date: last,
+        next_due_date: nextDueDateStr,
+        status: 'Upcoming'
       });
 
       renderTable();
-      document.getElementById('addAptForm').reset();
-      alert('Unit added! Click "Save / Download data.json" to persist your updates to GitHub.');
+      document.getElementById('addServiceForm').reset();
+      alert('Service added! Click "Save / Download data.json" to commit changes to GitHub.');
     });
 
-    // Advance cycle by 90 days
+    // Mark Done: advances cycle by 90 days
     window.markDone = function(index) {
       const item = serviceRecords[index];
-      const nextDate = new Date(item.next_due_date);
+      const completedDate = item.next_due_date;
+      
+      const nextDate = new Date(completedDate);
       nextDate.setDate(nextDate.getDate() + 90);
 
-      item.last_service_date = item.next_due_date;
+      item.last_service_date = completedDate;
       item.next_due_date = nextDate.toISOString().split('T')[0];
       item.status = 'Upcoming';
 
       renderTable();
-      alert(`Updated ${item.unit_number} - ${item.service_type} to ${item.next_due_date}. Click "Save / Download data.json" to save.`);
+      alert(`Updated! ${item.building_name} (${item.unit_number}) set to ${item.next_due_date}. Download data.json to save.`);
     };
 
-    // Download updated JSON to commit back to GitHub
+    // Download updated JSON
     document.getElementById('downloadBtn').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(serviceRecords, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
