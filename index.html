@@ -79,6 +79,7 @@
 
       <!-- Tables -->
       <div class="lg:col-span-2 space-y-6">
+        <!-- Active Schedules -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
           <div class="flex justify-between items-center mb-3">
             <h2 class="font-semibold text-lg text-slate-900">Active Service Schedules</h2>
@@ -102,16 +103,21 @@
           </div>
         </div>
 
+        <!-- Completed Log -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
-          <h2 class="font-semibold text-md text-slate-900 mb-2">📜 Completed Service Log</h2>
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="font-semibold text-md text-slate-900">📜 Completed Service Log</h2>
+            <span class="text-xs text-slate-400">Past completions</span>
+          </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-600">
               <thead>
                 <tr class="border-b bg-slate-50">
                   <th class="p-2">Property</th>
+                  <th class="p-2">Tenant</th>
                   <th class="p-2">Service</th>
                   <th class="p-2">Date Serviced</th>
-                  <th class="p-2">Next Due Calculated</th>
+                  <th class="p-2">Next Due Set</th>
                 </tr>
               </thead>
               <tbody id="historyList"></tbody>
@@ -124,7 +130,10 @@
 
   <script>
     const GITHUB_REPO = "ekodio/apartment-service-reminders";
-    let serviceRecords = [];
+    let state = {
+      schedules: [],
+      history: []
+    };
     let fileSha = "";
 
     const lastDateInput = document.getElementById('lastDate');
@@ -150,12 +159,12 @@
       const val = document.getElementById('ghToken').value.trim();
       if (val) {
         localStorage.setItem('gh_sync_token', val);
-        alert('GitHub Token saved! Changes will now auto-save directly to GitHub.');
+        alert('GitHub Token saved!');
         loadData();
       }
     }
 
-    // Load data.json directly from GitHub API to obtain file SHA
+    // Load data from GitHub API
     async function loadData() {
       const token = getToken();
       if (token) {
@@ -168,22 +177,32 @@
         const fileData = await res.json();
         
         fileSha = fileData.sha;
-        // Decode base64 UTF-8 content
         const content = decodeURIComponent(escape(atob(fileData.content)));
-        serviceRecords = JSON.parse(content);
+        const parsed = JSON.parse(content);
+        
+        // Handle backwards compatibility if data.json was an array
+        if (Array.isArray(parsed)) {
+          state.schedules = parsed;
+          state.history = JSON.parse(localStorage.getItem('apt_maintenance_history')) || [];
+        } else {
+          state.schedules = parsed.schedules || [];
+          state.history = parsed.history || [];
+        }
+
         renderTable();
+        renderHistory();
       } catch (err) {
         console.error('Fetch error:', err);
       }
     }
 
-    // Direct commit to GitHub repo via API
-    async function syncToGitHub(updatedList) {
+    // Sync whole state (schedules + history) to GitHub
+    async function syncToGitHub() {
       const token = getToken();
       const statusEl = document.getElementById('syncStatus');
 
       if (!token) {
-        alert('Please paste your GitHub Personal Access Token in the top right to enable instant cloud sync!');
+        alert('Please enter and save your GitHub Personal Access Token at the top right.');
         return;
       }
 
@@ -191,7 +210,12 @@
       statusEl.className = "text-xs font-medium text-amber-600";
 
       try {
-        const utf8Content = unescape(encodeURIComponent(JSON.stringify(updatedList, null, 2)));
+        const payload = {
+          schedules: state.schedules,
+          history: state.history
+        };
+
+        const utf8Content = unescape(encodeURIComponent(JSON.stringify(payload, null, 2)));
         const base64Content = btoa(utf8Content);
 
         const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/data.json`, {
@@ -201,7 +225,7 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            message: "Update maintenance schedule from web console",
+            message: "Update maintenance records & service log",
             content: base64Content,
             sha: fileSha
           })
@@ -210,8 +234,8 @@
         const resData = await res.json();
         if (res.ok) {
           fileSha = resData.content.sha;
-          serviceRecords = updatedList;
           renderTable();
+          renderHistory();
           statusEl.textContent = "● Live Saved to GitHub";
           statusEl.className = "text-xs font-medium text-emerald-600";
         } else {
@@ -224,12 +248,12 @@
 
     function renderTable() {
       const tbody = document.getElementById('servicesList');
-      if (!serviceRecords.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">No schedules recorded.</td></tr>';
+      if (!state.schedules.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">No active schedules. Add one on the left!</td></tr>';
         return;
       }
 
-      tbody.innerHTML = serviceRecords.map((item, index) => `
+      tbody.innerHTML = state.schedules.map((item, index) => `
         <tr class="border-b hover:bg-slate-50">
           <td class="p-2">
             <span class="font-semibold text-slate-900">${item.building_name} — ${item.unit_number}</span>
@@ -240,13 +264,31 @@
           <td class="p-2 font-mono text-xs text-slate-500">${item.last_service_date}</td>
           <td class="p-2 font-mono text-xs font-semibold text-blue-600">${item.next_due_date}</td>
           <td class="p-2 text-right space-x-1">
-            <button onclick="markDone(${index})" class="bg-green-50 text-green-700 border border-green-200 text-xs px-2 py-1 rounded hover:bg-green-100 font-medium">
+            <button onclick="markDone(${index})" class="bg-green-50 text-green-700 border border-green-200 text-xs px-2.5 py-1 rounded hover:bg-green-100 font-medium">
               ✓ Mark Done
             </button>
             <button onclick="deleteRecord(${index})" class="bg-red-50 text-red-600 border border-red-200 text-xs px-2 py-1 rounded hover:bg-red-100 font-medium">
               🗑️
             </button>
           </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderHistory() {
+      const hbody = document.getElementById('historyList');
+      if (!state.history.length) {
+        hbody.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-400">No completed services logged yet.</td></tr>';
+        return;
+      }
+
+      hbody.innerHTML = [...state.history].reverse().slice(0, 10).map(log => `
+        <tr class="border-b hover:bg-slate-50">
+          <td class="p-2 font-medium text-slate-900">${log.building_name} — ${log.unit_number}</td>
+          <td class="p-2 text-slate-600">${log.tenant_name || 'N/A'}</td>
+          <td class="p-2">${log.service_type}</td>
+          <td class="p-2 font-mono text-emerald-700 font-semibold">${log.completed_date}</td>
+          <td class="p-2 font-mono text-blue-600">${log.new_due_date}</td>
         </tr>
       `).join('');
     }
@@ -268,33 +310,45 @@
         status: 'Upcoming'
       };
 
-      const updated = [...serviceRecords, newRecord];
-      await syncToGitHub(updated);
+      state.schedules.push(newRecord);
+      await syncToGitHub();
       document.getElementById('addServiceForm').reset();
     });
 
-    // Mark Done
+    // Mark Done: updates next due date AND records to completed log
     window.markDone = async function(index) {
-      const updated = [...serviceRecords];
-      const item = { ...updated[index] };
+      const item = state.schedules[index];
       const completedDate = item.next_due_date;
       const cycle = item.cycle_days || 90;
 
       const nextDate = new Date(completedDate);
       nextDate.setDate(nextDate.getDate() + cycle);
+      const newDueDateStr = nextDate.toISOString().split('T')[0];
 
+      // Add to completed history log
+      state.history.push({
+        id: Date.now().toString(),
+        building_name: item.building_name,
+        unit_number: item.unit_number,
+        tenant_name: item.tenant_name,
+        service_type: item.service_type,
+        completed_date: completedDate,
+        new_due_date: newDueDateStr,
+        timestamp: new Date().toISOString()
+      });
+
+      // Advance active schedule
       item.last_service_date = completedDate;
-      item.next_due_date = nextDate.toISOString().split('T')[0];
-      updated[index] = item;
+      item.next_due_date = newDueDateStr;
 
-      await syncToGitHub(updated);
+      await syncToGitHub();
     };
 
     // Delete Record
     window.deleteRecord = async function(index) {
-      if (confirm(`Delete service schedule for ${serviceRecords[index].unit_number}?`)) {
-        const updated = serviceRecords.filter((_, i) => i !== index);
-        await syncToGitHub(updated);
+      if (confirm(`Delete service schedule for ${state.schedules[index].unit_number}?`)) {
+        state.schedules.splice(index, 1);
+        await syncToGitHub();
       }
     };
 
