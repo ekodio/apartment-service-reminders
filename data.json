@@ -1,0 +1,11 @@
+[
+  {
+    "id": "1",
+    "unit_number": "Flat 101",
+    "building_name": "Main Wing",
+    "service_type": "AC Service",
+    "last_service_date": "2026-06-07",
+    "next_due_date": "2026-09-07",
+    "status": "Upcoming"
+  }
+]
