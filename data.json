@@ -1,18 +1,5 @@
 {
-  "schedules": [
-    {
-      "id": "1",
-      "building_name": "adg",
-      "unit_number": "sfg",
-      "tenant_name": "sf",
-      "service_type": "sd",
-      "cycle_days": 90,
-      "first_service_date": "2026-08-01",
-      "last_service_date": "2028-01-23",
-      "next_due_date": "2028-04-22",
-      "status": "Upcoming"
-    }
-  ],
+  "schedules": [],
   "history": [
     {
       "id": "1788162005978",
