@@ -1,0 +1,59 @@
+name: Daily Maintenance Check & Alert
+
+on:
+  schedule:
+    - cron: '30 3 * * *' # Runs everyday at 09:00 AM IST (03:30 AM UTC)
+  workflow_dispatch: # Allows manual trigger button for testing
+
+jobs:
+  check-and-alert:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check 7-Day Due Dates & Send Notification
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('data.json', 'utf8'));
+
+            // Calculate target date (7 days from today)
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() + 7);
+            const targetStr = targetDate.toISOString().split('T')[0];
+
+            console.log(`Checking for maintenance due on: ${targetStr}`);
+
+            const dueItems = data.filter(item => item.next_due_date === targetStr);
+
+            if (dueItems.length === 0) {
+              console.log('No service reminders due in 7 days.');
+              return;
+            }
+
+            // Create notification body
+            let body = `## 🔔 Scheduled Maintenance Alert (Due in 7 Days)\n\nThe following apartment services are due for renewal on **${targetStr}**:\n\n`;
+            dueItems.forEach(item => {
+              body += `- 🏢 **${item.unit_number}** (${item.building_name}) — 🛠️ **${item.service_type}**\n`;
+            });
+            body += `\nPlease schedule the respective technicians and vendors.`;
+
+            // Open a GitHub Issue (triggers an instant Email notification to you)
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `⚠️ Service Reminder: ${dueItems.length} Unit(s) Due on ${targetStr}`,
+              body: body
+            });
+
+            console.log('Notification dispatched successfully via GitHub Issue.');
