@@ -25,23 +25,22 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const data = JSON.parse(fs.readFileSync('data.json', 'utf8'));
+            const fileContent = JSON.parse(fs.readFileSync('data.json', 'utf8'));
+            const schedules = Array.isArray(fileContent) ? fileContent : (fileContent.schedules || []);
 
-            // Target date: exactly 7 days from today
             const targetDate = new Date();
             targetDate.setDate(targetDate.getDate() + 7);
             const targetStr = targetDate.toISOString().split('T')[0];
 
             console.log(`Checking for maintenance due on: ${targetStr}`);
 
-            const dueItems = data.filter(item => item.next_due_date === targetStr);
+            const dueItems = schedules.filter(item => item.next_due_date === targetStr);
 
             if (dueItems.length === 0) {
               console.log('No service reminders due in 7 days.');
               return;
             }
 
-            // Construct notification body
             let body = `## 🔔 Scheduled Maintenance Alert (Due in 7 Days)\n\n`;
             body += `Attention: @${context.repo.owner}\n\n`;
             body += `The following service(s) are due on **${targetStr}**:\n\n`;
@@ -50,7 +49,6 @@ jobs:
               body += `### 🏢 ${item.building_name} — ${item.unit_number}\n`;
               body += `- **Tenant:** 👤 ${item.tenant_name || 'N/A'}\n`;
               body += `- **Service:** 🛠️ ${item.service_type}\n`;
-              body += `- **First Done:** 📅 ${item.first_service_date || 'N/A'}\n`;
               body += `- **Last Done:** 📅 ${item.last_service_date}\n`;
               body += `- **Due Date:** 🚨 **${item.next_due_date}**\n\n`;
             });
