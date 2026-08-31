@@ -1,15 +1,4 @@
 {
   "schedules": [],
-  "history": [
-    {
-      "id": "1788162005978",
-      "building_name": "adg",
-      "unit_number": "sfg",
-      "tenant_name": "sf",
-      "service_type": "sd",
-      "completed_date": "2028-01-23",
-      "new_due_date": "2028-04-22",
-      "timestamp": "2026-08-31T07:40:05.978Z"
-    }
-  ]
+  "history": []
 }
