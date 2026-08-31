@@ -1,1 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apartment Service Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-100 p-6 md:p-10 text-slate-800 font-sans">
+  <div class="max-w-5xl mx-auto space-y-6">
+    <header class="border-b pb-4">
+      <h1 class="text-2xl font-bold text-slate-900">Apartment Maintenance Console</h1>
+      <p class="text-sm text-slate-500">3-Month Recurring Tracking (AC, RO, Pest Control)</p>
+    </header>
 
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <h2 class="font-semibold text-lg mb-3">Add Serviced Apartment</h2>
+        <form id="addAptForm" class="space-y-3">
+          <input id="unitNumber" type="text" placeholder="Flat Number (e.g. 302)" required class="w-full p-2 border rounded text-sm">
+          <input id="buildingName" type="text" placeholder="Building (e.g. Tower B)" class="w-full p-2 border rounded text-sm">
+          <div>
+            <label class="text-xs text-slate-500 font-medium">Last Service Date</label>
+            <input id="startDate" type="date" required class="w-full p-2 border rounded text-sm mt-1">
+          </div>
+          <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded text-sm font-medium hover:bg-slate-800">
+            Add Unit (+90d Cycles)
+          </button>
+        </form>
+      </div>
+
+      <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
+        <h2 class="font-semibold text-lg mb-3">Scheduled Maintenance</h2>
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b bg-slate-50 text-slate-600">
+              <th class="p-2">Unit</th>
+              <th class="p-2">Service</th>
+              <th class="p-2">Next Due</th>
+              <th class="p-2">Action</th>
+            </tr>
+          </thead>
+          <tbody id="servicesList">
+            <tr><td colspan="4" class="p-4 text-center text-slate-400">Loading schedules...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 1. Configure Supabase (Replace with your keys)
+    const SUPABASE_URL = "YOUR_SUPABASE_URL";
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 2. Load Services
+    async function loadServices() {
+      const { data, error } = await supabase
+        .from('unit_services')
+        .select('*, apartments(unit_number, building_name)')
+        .order('next_due_date', { ascending: true });
+
+      const tbody = document.getElementById('servicesList');
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">No schedules found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(item => `
+        <tr class="border-b">
+          <td class="p-2 font-medium">${item.apartments?.unit_number} <span class="text-xs text-slate-400 block">${item.apartments?.building_name || ''}</span></td>
+          <td class="p-2">${item.service_type}</td>
+          <td class="p-2 font-mono text-xs">${item.next_due_date}</td>
+          <td class="p-2">
+            <button onclick="markDone('${item.id}', '${item.next_due_date}')" class="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-2 py-1 rounded">
+              Mark Done (+90d)
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // 3. Add Apartment & Initialize 3 Services
+    document.getElementById('addAptForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const unit = document.getElementById('unitNumber').value;
+      const building = document.getElementById('buildingName').value;
+      const startDate = document.getElementById('startDate').value;
+
+      const { data: apt } = await supabase.from('apartments').insert([{ unit_number: unit, building_name: building }]).select();
+      
+      const nextDate = new Date(startDate);
+      nextDate.setDate(nextDate.getDate() + 90);
+      const nextDueDateStr = nextDate.toISOString().split('T')[0];
+
+      const services = ['AC Service', 'RO Service', 'Pest Control'].map(type => ({
+        apartment_id: apt[0].id,
+        service_type: type,
+        last_service_date: startDate,
+        next_due_date: nextDueDateStr
+      }));
+
+      await supabase.from('unit_services').insert(services);
+      document.getElementById('addAptForm').reset();
+      loadServices();
+    });
+
+    // 4. Advance Date by 90 Days
+    async function markDone(id, currentDueDate) {
+      const nextDate = new Date(currentDueDate);
+      nextDate.setDate(nextDate.getDate() + 90);
+      await supabase.from('unit_services').update({
+        last_service_date: currentDueDate,
+        next_due_date: nextDate.toISOString().split('T')[0],
+        reminder_sent: false
+      }).eq('id', id);
+      loadServices();
+    }
+
+    loadServices();
+  </script>
+</body>
+</html>
