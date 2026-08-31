@@ -3,78 +3,98 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Apartment Service Tracker</title>
+  <title>Apartment Maintenance Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-slate-100 p-6 md:p-10 text-slate-800 font-sans">
   <div class="max-w-5xl mx-auto space-y-6">
-    <header class="border-b pb-4">
+    <header class="border-b border-slate-200 pb-4">
       <h1 class="text-2xl font-bold text-slate-900">Apartment Maintenance Console</h1>
-      <p class="text-sm text-slate-500">3-Month Recurring Tracking (AC, RO, Pest Control)</p>
+      <p class="text-sm text-slate-500">Self-Hosted 3-Month Recurring Cycle Tracker (AC, RO, Pest Control)</p>
     </header>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Add Flat Form -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <h2 class="font-semibold text-lg mb-3">Add Serviced Apartment</h2>
         <form id="addAptForm" class="space-y-3">
-          <input id="unitNumber" type="text" placeholder="Flat Number (e.g. 302)" required class="w-full p-2 border rounded text-sm">
-          <input id="buildingName" type="text" placeholder="Building (e.g. Tower B)" class="w-full p-2 border rounded text-sm">
           <div>
-            <label class="text-xs text-slate-500 font-medium">Last Service Date</label>
+            <label class="text-xs text-slate-600 font-medium">Flat / Unit Number</label>
+            <input id="unitNumber" type="text" placeholder="e.g. Flat 302" required class="w-full p-2 border rounded text-sm mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-slate-600 font-medium">Building / Tower</label>
+            <input id="buildingName" type="text" placeholder="e.g. Tower A" class="w-full p-2 border rounded text-sm mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-slate-600 font-medium">Last Service Date (Base Date)</label>
             <input id="startDate" type="date" required class="w-full p-2 border rounded text-sm mt-1">
           </div>
-          <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded text-sm font-medium hover:bg-slate-800">
+          <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded text-sm font-medium hover:bg-slate-800 transition">
             Add Unit (+90d Cycles)
           </button>
         </form>
       </div>
 
+      <!-- Schedule Table -->
       <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
-        <h2 class="font-semibold text-lg mb-3">Scheduled Maintenance</h2>
-        <table class="w-full text-left text-sm">
-          <thead>
-            <tr class="border-b bg-slate-50 text-slate-600">
-              <th class="p-2">Unit</th>
-              <th class="p-2">Service</th>
-              <th class="p-2">Next Due</th>
-              <th class="p-2">Action</th>
-            </tr>
-          </thead>
-          <tbody id="servicesList">
-            <tr><td colspan="4" class="p-4 text-center text-slate-400">Loading schedules...</td></tr>
-          </tbody>
-        </table>
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="font-semibold text-lg">Scheduled Services</h2>
+          <button id="downloadBtn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded border">
+            📥 Save / Download data.json
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b bg-slate-50 text-slate-600">
+                <th class="p-2">Unit</th>
+                <th class="p-2">Service</th>
+                <th class="p-2">Next Due</th>
+                <th class="p-2">Action</th>
+              </tr>
+            </thead>
+            <tbody id="servicesList">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    // 1. Configure Supabase (Replace with your keys)
-    const SUPABASE_URL = "YOUR_SUPABASE_URL";
-    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let serviceRecords = [];
 
-    // 2. Load Services
-    async function loadServices() {
-      const { data, error } = await supabase
-        .from('unit_services')
-        .select('*, apartments(unit_number, building_name)')
-        .order('next_due_date', { ascending: true });
+    // Load data from repository's data.json
+    async function loadData() {
+      try {
+        const response = await fetch('./data.json');
+        serviceRecords = await response.json();
+        renderTable();
+      } catch (err) {
+        console.error('Could not load data.json', err);
+      }
+    }
 
+    function renderTable() {
       const tbody = document.getElementById('servicesList');
-      if (!data || data.length === 0) {
+      if (!serviceRecords.length) {
         tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">No schedules found.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = data.map(item => `
-        <tr class="border-b">
-          <td class="p-2 font-medium">${item.apartments?.unit_number} <span class="text-xs text-slate-400 block">${item.apartments?.building_name || ''}</span></td>
-          <td class="p-2">${item.service_type}</td>
+      tbody.innerHTML = serviceRecords.map((item, index) => `
+        <tr class="border-b hover:bg-slate-50">
+          <td class="p-2 font-medium">
+            ${item.unit_number} 
+            <span class="text-xs text-slate-400 block">${item.building_name || ''}</span>
+          </td>
+          <td class="p-2 font-medium text-slate-700">${item.service_type}</td>
           <td class="p-2 font-mono text-xs">${item.next_due_date}</td>
           <td class="p-2">
-            <button onclick="markDone('${item.id}', '${item.next_due_date}')" class="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-2 py-1 rounded">
+            <button onclick="markDone(${index})" class="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-2 py-1 rounded hover:bg-blue-100">
               Mark Done (+90d)
             </button>
           </td>
@@ -82,44 +102,61 @@
       `).join('');
     }
 
-    // 3. Add Apartment & Initialize 3 Services
-    document.getElementById('addAptForm').addEventListener('submit', async (e) => {
+    // Add Flat & Auto-generate 3 services
+    document.getElementById('addAptForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const unit = document.getElementById('unitNumber').value;
       const building = document.getElementById('buildingName').value;
       const startDate = document.getElementById('startDate').value;
 
-      const { data: apt } = await supabase.from('apartments').insert([{ unit_number: unit, building_name: building }]).select();
-      
-      const nextDate = new Date(startDate);
+      const baseDate = new Date(startDate);
+      const nextDate = new Date(baseDate);
       nextDate.setDate(nextDate.getDate() + 90);
       const nextDueDateStr = nextDate.toISOString().split('T')[0];
 
-      const services = ['AC Service', 'RO Service', 'Pest Control'].map(type => ({
-        apartment_id: apt[0].id,
-        service_type: type,
-        last_service_date: startDate,
-        next_due_date: nextDueDateStr
-      }));
+      const services = ['AC Service', 'RO Service', 'Pest Control'];
+      services.forEach((srv) => {
+        serviceRecords.push({
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+          unit_number: unit,
+          building_name: building,
+          service_type: srv,
+          last_service_date: startDate,
+          next_due_date: nextDueDateStr,
+          status: 'Upcoming'
+        });
+      });
 
-      await supabase.from('unit_services').insert(services);
+      renderTable();
       document.getElementById('addAptForm').reset();
-      loadServices();
+      alert('Unit added! Click "Save / Download data.json" to persist your updates to GitHub.');
     });
 
-    // 4. Advance Date by 90 Days
-    async function markDone(id, currentDueDate) {
-      const nextDate = new Date(currentDueDate);
+    // Advance cycle by 90 days
+    window.markDone = function(index) {
+      const item = serviceRecords[index];
+      const nextDate = new Date(item.next_due_date);
       nextDate.setDate(nextDate.getDate() + 90);
-      await supabase.from('unit_services').update({
-        last_service_date: currentDueDate,
-        next_due_date: nextDate.toISOString().split('T')[0],
-        reminder_sent: false
-      }).eq('id', id);
-      loadServices();
-    }
 
-    loadServices();
+      item.last_service_date = item.next_due_date;
+      item.next_due_date = nextDate.toISOString().split('T')[0];
+      item.status = 'Upcoming';
+
+      renderTable();
+      alert(`Updated ${item.unit_number} - ${item.service_type} to ${item.next_due_date}. Click "Save / Download data.json" to save.`);
+    };
+
+    // Download updated JSON to commit back to GitHub
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(serviceRecords, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'data.json';
+      a.click();
+    });
+
+    loadData();
   </script>
 </body>
 </html>
