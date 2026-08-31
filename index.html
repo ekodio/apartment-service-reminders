@@ -83,7 +83,7 @@
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
           <div class="flex justify-between items-center mb-3">
             <h2 class="font-semibold text-lg text-slate-900">Active Service Schedules</h2>
-            <span id="syncStatus" class="text-xs font-medium text-emerald-600">● Live Connected</span>
+            <span id="syncStatus" class="text-xs font-medium text-emerald-600">● Live Saved to GitHub</span>
           </div>
 
           <div class="overflow-x-auto">
@@ -107,14 +107,13 @@
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
           <div class="flex justify-between items-center mb-2">
             <h2 class="font-semibold text-md text-slate-900">📜 Completed Service Log</h2>
-            <span class="text-xs text-slate-400">Past completions</span>
+            <button onclick="clearHistory()" class="text-[11px] text-red-500 hover:underline">Clear History</button>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-600">
               <thead>
                 <tr class="border-b bg-slate-50">
-                  <th class="p-2">Property</th>
-                  <th class="p-2">Tenant</th>
+                  <th class="p-2">Property & Tenant</th>
                   <th class="p-2">Service</th>
                   <th class="p-2">Date Serviced</th>
                   <th class="p-2">Next Due Set</th>
@@ -164,7 +163,6 @@
       }
     }
 
-    // Load data from GitHub API
     async function loadData() {
       const token = getToken();
       if (token) {
@@ -180,7 +178,6 @@
         const content = decodeURIComponent(escape(atob(fileData.content)));
         const parsed = JSON.parse(content);
         
-        // Handle backwards compatibility if data.json was an array
         if (Array.isArray(parsed)) {
           state.schedules = parsed;
           state.history = JSON.parse(localStorage.getItem('apt_maintenance_history')) || [];
@@ -196,13 +193,20 @@
       }
     }
 
-    // Sync whole state (schedules + history) to GitHub
     async function syncToGitHub() {
       const token = getToken();
       const statusEl = document.getElementById('syncStatus');
 
+      // Local storage backup
+      localStorage.setItem('apt_maintenance_records', JSON.stringify(state.schedules));
+      localStorage.setItem('apt_maintenance_history', JSON.stringify(state.history));
+
+      renderTable();
+      renderHistory();
+
       if (!token) {
-        alert('Please enter and save your GitHub Personal Access Token at the top right.');
+        statusEl.textContent = "● Saved Locally (Add Token to sync Cloud)";
+        statusEl.className = "text-xs font-medium text-amber-600";
         return;
       }
 
@@ -225,7 +229,7 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            message: "Update maintenance records & service log",
+            message: "Update maintenance schedules and completed log",
             content: base64Content,
             sha: fileSha
           })
@@ -234,22 +238,22 @@
         const resData = await res.json();
         if (res.ok) {
           fileSha = resData.content.sha;
-          renderTable();
-          renderHistory();
           statusEl.textContent = "● Live Saved to GitHub";
           statusEl.className = "text-xs font-medium text-emerald-600";
         } else {
-          alert('Failed to save to GitHub: ' + resData.message);
+          statusEl.textContent = "❌ Sync Error";
+          statusEl.className = "text-xs font-medium text-red-600";
         }
       } catch (err) {
-        alert('Network error syncing to GitHub');
+        statusEl.textContent = "❌ Network Error";
+        statusEl.className = "text-xs font-medium text-red-600";
       }
     }
 
     function renderTable() {
       const tbody = document.getElementById('servicesList');
       if (!state.schedules.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">No active schedules. Add one on the left!</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">No active schedules.</td></tr>';
         return;
       }
 
@@ -277,23 +281,25 @@
 
     function renderHistory() {
       const hbody = document.getElementById('historyList');
-      if (!state.history.length) {
-        hbody.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-400">No completed services logged yet.</td></tr>';
+      if (!state.history || !state.history.length) {
+        hbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-400">No completed services logged yet.</td></tr>';
         return;
       }
 
-      hbody.innerHTML = [...state.history].reverse().slice(0, 10).map(log => `
+      hbody.innerHTML = [...state.history].reverse().map(log => `
         <tr class="border-b hover:bg-slate-50">
-          <td class="p-2 font-medium text-slate-900">${log.building_name} — ${log.unit_number}</td>
-          <td class="p-2 text-slate-600">${log.tenant_name || 'N/A'}</td>
-          <td class="p-2">${log.service_type}</td>
+          <td class="p-2">
+            <span class="font-semibold text-slate-800">${log.building_name} — ${log.unit_number}</span>
+            <span class="text-xs text-slate-400 block">${log.tenant_name || ''}</span>
+          </td>
+          <td class="p-2 font-medium text-slate-700">${log.service_type}</td>
           <td class="p-2 font-mono text-emerald-700 font-semibold">${log.completed_date}</td>
           <td class="p-2 font-mono text-blue-600">${log.new_due_date}</td>
         </tr>
       `).join('');
     }
 
-    // Add Service
+    // Add Service Form Submit
     document.getElementById('addServiceForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -315,7 +321,7 @@
       document.getElementById('addServiceForm').reset();
     });
 
-    // Mark Done: updates next due date AND records to completed log
+    // Mark Done
     window.markDone = async function(index) {
       const item = state.schedules[index];
       const completedDate = item.next_due_date;
@@ -325,7 +331,7 @@
       nextDate.setDate(nextDate.getDate() + cycle);
       const newDueDateStr = nextDate.toISOString().split('T')[0];
 
-      // Add to completed history log
+      // Add to completed history
       state.history.push({
         id: Date.now().toString(),
         building_name: item.building_name,
@@ -337,7 +343,7 @@
         timestamp: new Date().toISOString()
       });
 
-      // Advance active schedule
+      // Update active schedule
       item.last_service_date = completedDate;
       item.next_due_date = newDueDateStr;
 
@@ -346,8 +352,16 @@
 
     // Delete Record
     window.deleteRecord = async function(index) {
-      if (confirm(`Delete service schedule for ${state.schedules[index].unit_number}?`)) {
+      if (confirm(`Delete schedule for ${state.schedules[index].unit_number}?`)) {
         state.schedules.splice(index, 1);
+        await syncToGitHub();
+      }
+    };
+
+    // Clear History Log
+    window.clearHistory = async function() {
+      if (confirm('Clear the completed service history log?')) {
+        state.history = [];
         await syncToGitHub();
       }
     };
