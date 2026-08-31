@@ -1,5 +1,6 @@
 {
-  "schedules": [
+  "schedules": [],
+  "history": [
     {
       "id": "1788162149626",
       "building_name": "aerg",
@@ -7,11 +8,8 @@
       "tenant_name": "sdf",
       "service_type": "sdfg",
       "cycle_days": 90,
-      "first_service_date": "2026-08-01",
-      "last_service_date": "2026-08-01",
-      "next_due_date": "2026-10-30",
-      "status": "Upcoming"
+      "completed_date": "2026-08-31",
+      "timestamp": "2026-08-31T07:42:30.650Z"
     }
-  ],
-  "history": []
+  ]
 }
