@@ -1,14 +1,1 @@
-[
-  {
-    "id": "1788161551713",
-    "building_name": "sffg",
-    "unit_number": "sdf",
-    "tenant_name": "sg",
-    "service_type": "sdfzv",
-    "cycle_days": 30,
-    "first_service_date": "2026-07-01",
-    "last_service_date": "2026-09-30",
-    "next_due_date": "2026-10-30",
-    "status": "Upcoming"
-  }
-]
+[]
