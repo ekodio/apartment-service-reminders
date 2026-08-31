@@ -2,7 +2,7 @@ name: Daily Maintenance Check & Alert
 
 on:
   schedule:
-    - cron: '30 3 * * *' # Runs daily at 09:00 AM IST (03:30 AM UTC)
+    - cron: '30 3 * * *' # Runs daily at 09:00 AM IST
   workflow_dispatch:
 
 jobs:
@@ -41,8 +41,10 @@ jobs:
               return;
             }
 
-            // Construct notification with building and tenant details
-            let body = `## 🔔 Scheduled Maintenance Alert (Due in 7 Days)\n\nThe following service(s) are due on **${targetStr}**:\n\n`;
+            // Construct notification body
+            let body = `## 🔔 Scheduled Maintenance Alert (Due in 7 Days)\n\n`;
+            body += `Attention: @${context.repo.owner}\n\n`;
+            body += `The following service(s) are due on **${targetStr}**:\n\n`;
             
             dueItems.forEach(item => {
               body += `### 🏢 ${item.building_name} — ${item.unit_number}\n`;
@@ -52,13 +54,14 @@ jobs:
               body += `- **Last Done:** 📅 ${item.last_service_date}\n`;
               body += `- **Due Date:** 🚨 **${item.next_due_date}**\n\n`;
             });
-            body += `> Please coordinate with the tenant and book vendor slots.`;
+            body += `> Please coordinate with vendors and tenants to confirm maintenance slots.`;
 
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `⚠️ Service Reminder: ${dueItems.length} Unit(s) Due on ${targetStr}`,
-              body: body
+              title: `⚠️ Maintenance Due in 7 Days: ${dueItems.length} Unit(s) on ${targetStr}`,
+              body: body,
+              assignees: [context.repo.owner]
             });
 
-            console.log('Alert created successfully.');
+            console.log('Alert issue created and assigned.');
