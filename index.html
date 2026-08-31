@@ -115,8 +115,8 @@
                 <tr class="border-b bg-slate-50">
                   <th class="p-2">Property & Tenant</th>
                   <th class="p-2">Service</th>
-                  <th class="p-2">Date Serviced</th>
-                  <th class="p-2">Next Due Set</th>
+                  <th class="p-2">Date Completed</th>
+                  <th class="p-2 text-right">Action</th>
                 </tr>
               </thead>
               <tbody id="historyList"></tbody>
@@ -197,7 +197,6 @@
       const token = getToken();
       const statusEl = document.getElementById('syncStatus');
 
-      // Local storage backup
       localStorage.setItem('apt_maintenance_records', JSON.stringify(state.schedules));
       localStorage.setItem('apt_maintenance_history', JSON.stringify(state.history));
 
@@ -286,7 +285,7 @@
         return;
       }
 
-      hbody.innerHTML = [...state.history].reverse().map(log => `
+      hbody.innerHTML = [...state.history].reverse().map((log, index) => `
         <tr class="border-b hover:bg-slate-50">
           <td class="p-2">
             <span class="font-semibold text-slate-800">${log.building_name} — ${log.unit_number}</span>
@@ -294,12 +293,16 @@
           </td>
           <td class="p-2 font-medium text-slate-700">${log.service_type}</td>
           <td class="p-2 font-mono text-emerald-700 font-semibold">${log.completed_date}</td>
-          <td class="p-2 font-mono text-blue-600">${log.new_due_date}</td>
+          <td class="p-2 text-right">
+            <button onclick="reopenService(${state.history.length - 1 - index})" class="text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 px-2 py-1 rounded border">
+              ↩ Re-activate
+            </button>
+          </td>
         </tr>
       `).join('');
     }
 
-    // Add Service Form Submit
+    // Add Service Form
     document.getElementById('addServiceForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -321,32 +324,52 @@
       document.getElementById('addServiceForm').reset();
     });
 
-    // Mark Done
+    // Mark Done: Moves item from active list to completed log
     window.markDone = async function(index) {
       const item = state.schedules[index];
-      const completedDate = item.next_due_date;
-      const cycle = item.cycle_days || 90;
+      const today = new Date().toISOString().split('T')[0];
 
-      const nextDate = new Date(completedDate);
-      nextDate.setDate(nextDate.getDate() + cycle);
-      const newDueDateStr = nextDate.toISOString().split('T')[0];
-
-      // Add to completed history
+      // Add to completed log
       state.history.push({
+        id: item.id || Date.now().toString(),
+        building_name: item.building_name,
+        unit_number: item.unit_number,
+        tenant_name: item.tenant_name,
+        service_type: item.service_type,
+        cycle_days: item.cycle_days || 90,
+        completed_date: today,
+        timestamp: new Date().toISOString()
+      });
+
+      // Remove from active schedules
+      state.schedules.splice(index, 1);
+
+      await syncToGitHub();
+    };
+
+    // Re-activate a completed item if you need to schedule it again
+    window.reopenService = async function(historyIndex) {
+      const item = state.history[historyIndex];
+      const today = new Date();
+      const cycle = item.cycle_days || 90;
+      
+      const nextDue = new Date(today);
+      nextDue.setDate(nextDue.getDate() + cycle);
+
+      state.schedules.push({
         id: Date.now().toString(),
         building_name: item.building_name,
         unit_number: item.unit_number,
         tenant_name: item.tenant_name,
         service_type: item.service_type,
-        completed_date: completedDate,
-        new_due_date: newDueDateStr,
-        timestamp: new Date().toISOString()
+        cycle_days: cycle,
+        first_service_date: item.completed_date,
+        last_service_date: item.completed_date,
+        next_due_date: nextDue.toISOString().split('T')[0],
+        status: 'Upcoming'
       });
 
-      // Update active schedule
-      item.last_service_date = completedDate;
-      item.next_due_date = newDueDateStr;
-
+      state.history.splice(historyIndex, 1);
       await syncToGitHub();
     };
 
@@ -360,7 +383,7 @@
 
     // Clear History Log
     window.clearHistory = async function() {
-      if (confirm('Clear the completed service history log?')) {
+      if (confirm('Clear all completed service records?')) {
         state.history = [];
         await syncToGitHub();
       }
