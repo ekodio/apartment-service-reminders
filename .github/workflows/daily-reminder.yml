@@ -15,6 +15,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Check Due Dates & Dispatch Alert
         uses: actions/github-script@v7
         with:
@@ -34,23 +39,25 @@ jobs:
               return;
             }
 
-            // Clean, human-readable card format (renders properly on all mobile email apps)
-            let body = `Maintenance is due in **7 days** (${targetStr}) for the following unit(s):\n\n`;
+            let body = `### 📌 Maintenance Due in 7 Days (${targetStr})\n\n`;
+            body += `The following **${dueItems.length} unit(s)** require service coordination:\n\n`;
 
             dueItems.forEach((item, idx) => {
-              body += `**${idx + 1}. ${item.building_name} — Unit ${item.unit_number}**\n`;
-              body += `• Service: **${item.service_type}**\n`;
-              body += `• Tenant: ${item.tenant_name || 'N/A'}\n`;
-              body += `• Due Date: **${item.next_due_date}** (Last done: ${item.last_service_date})\n\n`;
+              body += `---\n\n`;
+              body += `### ${idx + 1}. ${item.building_name} — Unit ${item.unit_number}\n\n`;
+              body += `* **Service Required:** ${item.service_type}\n`;
+              body += `* **Tenant Name:** ${item.tenant_name || 'N/A'}\n`;
+              body += `* **Scheduled Due Date:** 🚨 **${item.next_due_date}**\n`;
+              body += `* **Last Service Date:** ${item.last_service_date}\n\n`;
             });
 
-            body += `[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)\n`;
+            body += `---\n\n`;
+            body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)**\n`;
 
-            // Single call with assignees included prevents the duplicate "Re:" email
+            // Omitting 'assignees' ensures GitHub only sends ONE email instead of two
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Maintenance Alert: ${dueItems.length} unit(s) due on ${targetStr}`,
-              body: body,
-              assignees: [context.repo.owner]
+              body: body
             });
