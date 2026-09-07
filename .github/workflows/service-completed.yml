@@ -1,0 +1,96 @@
+name: Service Completion Alert
+
+on:
+  workflow_dispatch:
+    inputs:
+      building_name:
+        description: 'Building Name'
+        required: true
+      unit_number:
+        description: 'Unit Number'
+        required: true
+      tenant_name:
+        description: 'Tenant Name'
+        required: false
+        default: 'N/A'
+      service_type:
+        description: 'Service Type'
+        required: true
+      completed_date:
+        description: 'Completed Date (YYYY-MM-DD)'
+        required: true
+      next_due_date:
+        description: 'Next Due Date (YYYY-MM-DD)'
+        required: true
+      cycle_days:
+        description: 'Cycle Days'
+        required: false
+        default: '90'
+
+jobs:
+  notify-completion:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Dispatch Completion Notification
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const formatToDMY = (dStr) => {
+              if (!dStr) return 'N/A';
+              const parts = dStr.split('-');
+              return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : dStr;
+            };
+
+            const building = "${{ inputs.building_name }}";
+            const unit = "${{ inputs.unit_number }}";
+            const tenant = "${{ inputs.tenant_name }}";
+            const service = "${{ inputs.service_type }}";
+            const completedDMY = formatToDMY("${{ inputs.completed_date }}");
+            const nextDueDMY = formatToDMY("${{ inputs.next_due_date }}");
+            const cycle = "${{ inputs.cycle_days }}";
+
+            let body = `Attention: @${context.repo.owner}\n\n`;
+            body += `## Service Completed Successfully\n\n`;
+            body += `<table width="100%" border="1" cellpadding="10" cellspacing="0">\n`;
+            body += `  <tbody>\n`;
+            body += `    <tr>\n`;
+            body += `      <td width="38%"><strong>Property / Flat</strong></td>\n`;
+            body += `      <td width="62%">${building} — Unit ${unit}</td>\n`;
+            body += `    </tr>\n`;
+            body += `    <tr>\n`;
+            body += `      <td width="38%"><strong>Service Done</strong></td>\n`;
+            body += `      <td width="62%">${service}</td>\n`;
+            body += `    </tr>\n`;
+            body += `    <tr>\n`;
+            body += `      <td width="38%"><strong>Tenant</strong></td>\n`;
+            body += `      <td width="62%">${tenant}</td>\n`;
+            body += `    </tr>\n`;
+            body += `    <tr>\n`;
+            body += `      <td width="38%"><strong>Completed On</strong></td>\n`;
+            body += `      <td width="62%"><strong>${completedDMY}</strong></td>\n`;
+            body += `    </tr>\n`;
+            body += `    <tr>\n`;
+            body += `      <td width="38%"><strong>Next Scheduled Due</strong></td>\n`;
+            body += `      <td width="62%"><strong>${nextDueDMY}</strong> (${cycle} days cycle)</td>\n`;
+            body += `    </tr>\n`;
+            body += `  </tbody>\n`;
+            body += `</table>\n\n`;
+            body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)**\n`;
+
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Service Completed: ${service} — ${building} ${unit}`,
+              body: body
+            });
+
+            // Close automatically so it archives and keeps the open issue list clean
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.data.number,
+              state: 'closed'
+            });
