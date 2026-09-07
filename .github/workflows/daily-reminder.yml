@@ -8,6 +8,9 @@ on:
 jobs:
   check-and-alert:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -17,89 +20,52 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Nodemailer
-        run: npm install nodemailer
+      - name: Check Due Dates & Dispatch Alert
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const fileContent = JSON.parse(fs.readFileSync('data.json', 'utf8'));
+            const schedules = Array.isArray(fileContent) ? fileContent : (fileContent.schedules || []);
 
-      - name: Check Due Dates & Send Direct Email
-        env:
-          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-        run: |
-          node -e "
-          const fs = require('fs');
-          const nodemailer = require('nodemailer');
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() + 7);
+            const targetStr = targetDate.toISOString().split('T')[0];
 
-          const fileContent = JSON.parse(fs.readFileSync('data.json', 'utf8'));
-          const schedules = Array.isArray(fileContent) ? fileContent : (fileContent.schedules || []);
+            // Helper to format YYYY-MM-DD into DD-MM-YYYY
+            const formatToDMY = (dStr) => {
+              if (!dStr) return 'N/A';
+              const parts = dStr.split('-');
+              return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : dStr;
+            };
 
-          const targetDate = new Date();
-          targetDate.setDate(targetDate.getDate() + 7);
-          const targetStr = targetDate.toISOString().split('T')[0];
+            const targetDMY = formatToDMY(targetStr);
+            const dueItems = schedules.filter(item => item.next_due_date === targetStr);
 
-          const formatToDMY = (dStr) => {
-            if (!dStr) return 'N/A';
-            const p = dStr.split('-');
-            return p.length === 3 ? p[2] + '-' + p[1] + '-' + p[0] : dStr;
-          };
-
-          const targetDMY = formatToDMY(targetStr);
-          const dueItems = schedules.filter(item => item.next_due_date === targetStr);
-
-          if (dueItems.length === 0) {
-            console.log('No services due in 7 days.');
-            process.exit(0);
-          }
-
-          let itemsHtml = dueItems.map((item, idx) => \`
-            <div style=\"background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:18px 20px; margin-bottom:16px;\">
-              <div style=\"font-size:16px; font-weight:700; color:#0f172a; margin-bottom:12px;\">
-                \${idx + 1}. \${item.building_name} — Flat \${item.unit_number}
-              </div>
-              <ul style=\"margin:0; padding-left:20px; line-height:1.8; color:#334155; font-size:14px;\">
-                <li><strong>Service:</strong> \${item.service_type}</li>
-                <li><strong>Due Date:</strong> <span style=\"color:#2563eb; font-weight:700;\">\${formatToDMY(item.next_due_date)}</span></li>
-                <li><strong>Tenant:</strong> \${item.tenant_name || 'N/A'}</li>
-                <li><strong>Last Service:</strong> \${formatToDMY(item.last_service_date)}</li>
-              </ul>
-            </div>
-          \`).join('');
-
-          let htmlBody = \`
-            <div style=\"font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width:580px; margin:0 auto; padding:20px 10px; color:#334155;\">
-              <h2 style=\"margin:0 0 4px 0; color:#0f172a; font-size:20px; font-weight:700;\">Maintenance Alert</h2>
-              <p style=\"margin:0 0 20px 0; font-size:14px; color:#64748b;\">\${dueItems.length} unit(s) require scheduled maintenance on <strong>\${targetDMY}</strong>.</p>
-              
-              \${itemsHtml}
-
-              <div style=\"margin-top:24px; text-align:center;\">
-                <a href=\"https://ekodio.github.io/apartment-service-reminders/\" style=\"display:inline-block; background:#0f172a; color:#ffffff; padding:10px 20px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600;\">
-                  Open Maintenance Console
-                </a>
-              </div>
-            </div>
-          \`;
-
-          const transporter = nodemailer.createTransport({
-            host: 'smtppro.zoho.in', // use 'smtp.zoho.com' if your account is US/global
-            port: 465,
-            secure: true,
-            auth: {
-              user: process.env.MAIL_USERNAME,
-              pass: process.env.MAIL_PASSWORD
+            if (dueItems.length === 0) {
+              console.log('No services due in 7 days.');
+              return;
             }
-          });
 
-          transporter.sendMail({
-            from: '\"Ekodio Maintenance\" <' + process.env.MAIL_USERNAME + '>',
-            to: process.env.MAIL_USERNAME,
-            subject: 'Maintenance Alert: ' + dueItems.length + ' unit(s) due on ' + targetDMY,
-            html: htmlBody
-          }, (err, info) => {
-            if (err) {
-              console.error('Mail delivery failed:', err);
-              process.exit(1);
-            } else {
-              console.log('Email sent successfully:', info.messageId);
-            }
-          });
-          "
+            let body = `Attention: @${context.repo.owner}\n\n`;
+            body += `## Maintenance Due in 7 Days (${targetDMY})\n\n`;
+            body += `The following **${dueItems.length} unit(s)** are scheduled for maintenance:\n\n`;
+
+            dueItems.forEach((item, idx) => {
+              body += `---\n\n`;
+              body += `### ${idx + 1}. ${item.building_name} — Unit ${item.unit_number}\n\n`;
+              body += `* **Service:** ${item.service_type}\n`;
+              body += `* **Next Due Date:** ${formatToDMY(item.next_due_date)}\n`;
+              body += `* **Tenant:** ${item.tenant_name || 'N/A'}\n`;
+              body += `* **Last Service:** ${formatToDMY(item.last_service_date)}\n\n`;
+            });
+
+            body += `---\n\n`;
+            body += `[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)\n`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Maintenance Alert: ${dueItems.length} unit(s) due on ${targetDMY}`,
+              body: body
+            });
