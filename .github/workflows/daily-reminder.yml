@@ -32,7 +32,6 @@ jobs:
             targetDate.setDate(targetDate.getDate() + 7);
             const targetStr = targetDate.toISOString().split('T')[0];
 
-            // Helper to format YYYY-MM-DD into DD-MM-YYYY
             const formatToDMY = (dStr) => {
               if (!dStr) return 'N/A';
               const parts = dStr.split('-');
@@ -47,21 +46,38 @@ jobs:
               return;
             }
 
+            let rows = dueItems.map((item, idx) => `
+              <tr>
+                <td align="center">${idx + 1}</td>
+                <td><strong>${item.building_name}</strong> — Unit ${item.unit_number}</td>
+                <td>${item.service_type}</td>
+                <td align="center"><strong>${formatToDMY(item.next_due_date)}</strong></td>
+                <td>${item.tenant_name || 'N/A'}</td>
+                <td align="center">${formatToDMY(item.last_service_date)}</td>
+              </tr>
+            `).join('');
+
             let body = `Attention: @${context.repo.owner}\n\n`;
-            body += `## Maintenance Due in 7 Days (${targetDMY})\n\n`;
-            body += `The following **${dueItems.length} unit(s)** are scheduled for maintenance:\n\n`;
+            body += `### Maintenance Due in 7 Days (${targetDMY})\n\n`;
+            body += `The following **${dueItems.length} unit(s)** require service:\n\n`;
 
-            dueItems.forEach((item, idx) => {
-              body += `---\n\n`;
-              body += `### ${idx + 1}. ${item.building_name} — Unit ${item.unit_number}\n\n`;
-              body += `* **Service:** ${item.service_type}\n`;
-              body += `* **Next Due Date:** ${formatToDMY(item.next_due_date)}\n`;
-              body += `* **Tenant:** ${item.tenant_name || 'N/A'}\n`;
-              body += `* **Last Service:** ${formatToDMY(item.last_service_date)}\n\n`;
-            });
+            body += `<table width="100%" border="1" cellpadding="8" cellspacing="0">\n`;
+            body += `  <thead>\n`;
+            body += `    <tr bgcolor="#f8fafc">\n`;
+            body += `      <th align="center">#</th>\n`;
+            body += `      <th align="left">Property / Unit</th>\n`;
+            body += `      <th align="left">Service</th>\n`;
+            body += `      <th align="center">Next Due</th>\n`;
+            body += `      <th align="left">Tenant</th>\n`;
+            body += `      <th align="center">Last Done</th>\n`;
+            body += `    </tr>\n`;
+            body += `  </thead>\n`;
+            body += `  <tbody>\n`;
+            body += `    ${rows}\n`;
+            body += `  </tbody>\n`;
+            body += `</table>\n\n`;
 
-            body += `---\n\n`;
-            body += `[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)\n`;
+            body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)**\n`;
 
             await github.rest.issues.create({
               owner: context.repo.owner,
