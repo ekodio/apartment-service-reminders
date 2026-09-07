@@ -2,7 +2,7 @@ name: Daily Maintenance Check & Alert
 
 on:
   schedule:
-    - cron: '30 3 * * *' # Runs daily at 09:00 AM IST
+    - cron: '30 3 * * *' # 09:00 AM IST daily
   workflow_dispatch:
 
 jobs:
@@ -14,11 +14,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
 
       - name: Check Due Dates & Dispatch Alert
         uses: actions/github-script@v7
@@ -35,26 +30,27 @@ jobs:
             const dueItems = schedules.filter(item => item.next_due_date === targetStr);
 
             if (dueItems.length === 0) {
-              console.log('No service reminders due in 7 days.');
+              console.log('No services due in 7 days.');
               return;
             }
 
-            let body = `### 📋 Maintenance Due in 7 Days (${targetStr})\n\n`;
-            body += `| Property / Unit | Tenant | Service | Last Service | Target Due Date |\n`;
-            body += `| :--- | :--- | :--- | :--- | :--- |\n`;
+            // Clean, human-readable card format (renders properly on all mobile email apps)
+            let body = `Maintenance is due in **7 days** (${targetStr}) for the following unit(s):\n\n`;
 
-            dueItems.forEach(item => {
-              body += `| **${item.building_name}** - ${item.unit_number} | ${item.tenant_name || 'N/A'} | ${item.service_type} | ${item.last_service_date} | 🚨 **${item.next_due_date}** |\n`;
+            dueItems.forEach((item, idx) => {
+              body += `**${idx + 1}. ${item.building_name} — Unit ${item.unit_number}**\n`;
+              body += `• Service: **${item.service_type}**\n`;
+              body += `• Tenant: ${item.tenant_name || 'N/A'}\n`;
+              body += `• Due Date: **${item.next_due_date}** (Last done: ${item.last_service_date})\n\n`;
             });
 
-            body += `\n---\n`;
-            body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)** to coordinate vendors or mark jobs complete.\n`;
-            body += `\n> *This is an automated 7-day lead alert.*`;
+            body += `[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)\n`;
 
+            // Single call with assignees included prevents the duplicate "Re:" email
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `[Action Required] Maintenance Due in 7 Days: ${dueItems.length} Unit(s) on ${targetStr}`,
+              title: `Maintenance Alert: ${dueItems.length} unit(s) due on ${targetStr}`,
               body: body,
               assignees: [context.repo.owner]
             });
