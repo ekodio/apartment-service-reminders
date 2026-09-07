@@ -1,15 +1,4 @@
 {
   "schedules": [],
-  "history": [
-    {
-      "id": "1788171782690",
-      "building_name": "Ekodio",
-      "unit_number": "Ekodio",
-      "tenant_name": "Ekodio",
-      "service_type": "AC Service",
-      "cycle_days": 30,
-      "completed_date": "2026-08-31",
-      "timestamp": "2026-08-31T10:23:06.785Z"
-    }
-  ]
+  "history": []
 }
