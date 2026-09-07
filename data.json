@@ -8,8 +8,8 @@
       "service_type": "AC Service",
       "cycle_days": 90,
       "first_service_date": "2026-06-16",
-      "last_service_date": "2026-06-16",
-      "next_due_date": "2026-09-14",
+      "last_service_date": "2026-09-07",
+      "next_due_date": "2026-12-06",
       "status": "Upcoming"
     },
     {
@@ -37,5 +37,20 @@
       "status": "Upcoming"
     }
   ],
-  "history": []
+  "history": [
+    {
+      "id": "1788780639761",
+      "building_name": "Crest",
+      "unit_number": "101",
+      "tenant_name": "Test 1",
+      "service_type": "AC Service",
+      "cycle_days": 90,
+      "first_service_date": "2026-06-16",
+      "last_service_date": "2026-06-16",
+      "next_due_date": "2026-09-14",
+      "status": "Upcoming",
+      "completed_date": "2026-09-07",
+      "rolled_next_due": "2026-12-06"
+    }
+  ]
 }
