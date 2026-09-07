@@ -23,6 +23,18 @@
       "last_service_date": "2026-06-16",
       "next_due_date": "2026-09-14",
       "status": "Upcoming"
+    },
+    {
+      "id": "1788780682633",
+      "building_name": "Belarie",
+      "unit_number": "102",
+      "tenant_name": "Test 2",
+      "service_type": "RO Service",
+      "cycle_days": 90,
+      "first_service_date": "2026-06-16",
+      "last_service_date": "2026-06-16",
+      "next_due_date": "2026-09-14",
+      "status": "Upcoming"
     }
   ],
   "history": []
