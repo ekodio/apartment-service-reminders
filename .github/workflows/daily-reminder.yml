@@ -32,8 +32,6 @@ jobs:
             targetDate.setDate(targetDate.getDate() + 7);
             const targetStr = targetDate.toISOString().split('T')[0];
 
-            console.log(`Checking for maintenance due on: ${targetStr}`);
-
             const dueItems = schedules.filter(item => item.next_due_date === targetStr);
 
             if (dueItems.length === 0) {
@@ -41,25 +39,22 @@ jobs:
               return;
             }
 
-            let body = `## 🔔 Scheduled Maintenance Alert (Due in 7 Days)\n\n`;
-            body += `Attention: @${context.repo.owner}\n\n`;
-            body += `The following service(s) are due on **${targetStr}**:\n\n`;
-            
+            let body = `### 📋 Maintenance Due in 7 Days (${targetStr})\n\n`;
+            body += `| Property / Unit | Tenant | Service | Last Service | Target Due Date |\n`;
+            body += `| :--- | :--- | :--- | :--- | :--- |\n`;
+
             dueItems.forEach(item => {
-              body += `### 🏢 ${item.building_name} — ${item.unit_number}\n`;
-              body += `- **Tenant:** 👤 ${item.tenant_name || 'N/A'}\n`;
-              body += `- **Service:** 🛠️ ${item.service_type}\n`;
-              body += `- **Last Done:** 📅 ${item.last_service_date}\n`;
-              body += `- **Due Date:** 🚨 **${item.next_due_date}**\n\n`;
+              body += `| **${item.building_name}** - ${item.unit_number} | ${item.tenant_name || 'N/A'} | ${item.service_type} | ${item.last_service_date} | 🚨 **${item.next_due_date}** |\n`;
             });
-            body += `> Please coordinate with vendors and tenants to confirm maintenance slots.`;
+
+            body += `\n---\n`;
+            body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)** to coordinate vendors or mark jobs complete.\n`;
+            body += `\n> *This is an automated 7-day lead alert.*`;
 
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `⚠️ Maintenance Due in 7 Days: ${dueItems.length} Unit(s) on ${targetStr}`,
+              title: `[Action Required] Maintenance Due in 7 Days: ${dueItems.length} Unit(s) on ${targetStr}`,
               body: body,
               assignees: [context.repo.owner]
             });
-
-            console.log('Alert issue created and assigned.');
