@@ -1,18 +1,6 @@
 {
   "schedules": [
     {
-      "id": "1788776291688",
-      "building_name": "Ekodio",
-      "unit_number": "Ekodio",
-      "tenant_name": "Ekodio",
-      "service_type": "AC Service",
-      "cycle_days": 90,
-      "first_service_date": "2026-09-14",
-      "last_service_date": "2026-06-16",
-      "next_due_date": "2026-09-14",
-      "status": "Upcoming"
-    },
-    {
       "id": "1788780639761",
       "building_name": "Crest",
       "unit_number": "101",
@@ -49,5 +37,19 @@
       "status": "Upcoming"
     }
   ],
-  "history": []
+  "history": [
+    {
+      "id": "1788776291688",
+      "building_name": "Ekodio",
+      "unit_number": "Ekodio",
+      "tenant_name": "Ekodio",
+      "service_type": "AC Service",
+      "cycle_days": 90,
+      "first_service_date": "2026-09-14",
+      "last_service_date": "2026-06-16",
+      "next_due_date": "2026-09-14",
+      "status": "Upcoming",
+      "completed_date": "2026-09-07"
+    }
+  ]
 }
