@@ -39,22 +39,21 @@ jobs:
               return;
             }
 
-            let body = `### 📌 Maintenance Due in 7 Days (${targetStr})\n\n`;
-            body += `The following **${dueItems.length} unit(s)** require service coordination:\n\n`;
+            let body = `Attention: @${context.repo.owner}\n\n`;
+            body += `Maintenance is scheduled in **7 days** (${targetStr}) for **${dueItems.length} unit(s)**:\n\n`;
 
             dueItems.forEach((item, idx) => {
               body += `---\n\n`;
               body += `### ${idx + 1}. ${item.building_name} — Unit ${item.unit_number}\n\n`;
-              body += `* **Service Required:** ${item.service_type}\n`;
-              body += `* **Tenant Name:** ${item.tenant_name || 'N/A'}\n`;
-              body += `* **Scheduled Due Date:** 🚨 **${item.next_due_date}**\n`;
-              body += `* **Last Service Date:** ${item.last_service_date}\n\n`;
+              body += `* **Service:** ${item.service_type}\n`;
+              body += `* **Tenant:** ${item.tenant_name || 'N/A'}\n`;
+              body += `* **Due Date:** 🚨 **${item.next_due_date}**\n`;
+              body += `* **Last Done:** ${item.last_service_date}\n\n`;
             });
 
             body += `---\n\n`;
             body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)**\n`;
 
-            // Omitting 'assignees' ensures GitHub only sends ONE email instead of two
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
