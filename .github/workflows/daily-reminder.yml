@@ -32,6 +32,14 @@ jobs:
             targetDate.setDate(targetDate.getDate() + 7);
             const targetStr = targetDate.toISOString().split('T')[0];
 
+            // Helper to turn YYYY-MM-DD into DD-MM-YYYY
+            const formatToDMY = (dStr) => {
+              if (!dStr) return 'N/A';
+              const parts = dStr.split('-');
+              return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : dStr;
+            };
+
+            const targetDMY = formatToDMY(targetStr);
             const dueItems = schedules.filter(item => item.next_due_date === targetStr);
 
             if (dueItems.length === 0) {
@@ -40,15 +48,17 @@ jobs:
             }
 
             let body = `Attention: @${context.repo.owner}\n\n`;
-            body += `Maintenance is scheduled in **7 days** (${targetStr}) for **${dueItems.length} unit(s)**:\n\n`;
+            body += `# 7-Day Maintenance Alert\n\n`;
+            body += `Scheduled Target Date: **${targetDMY}**\n\n`;
+            body += `Total Units Requiring Action: **${dueItems.length}**\n\n`;
 
             dueItems.forEach((item, idx) => {
               body += `---\n\n`;
-              body += `### ${idx + 1}. ${item.building_name} — Unit ${item.unit_number}\n\n`;
-              body += `* **Service:** ${item.service_type}\n`;
-              body += `* **Tenant:** ${item.tenant_name || 'N/A'}\n`;
-              body += `* **Due Date:** 🚨 **${item.next_due_date}**\n`;
-              body += `* **Last Done:** ${item.last_service_date}\n\n`;
+              body += `### Property #${idx + 1}: ${item.building_name} — Flat ${item.unit_number}\n\n`;
+              body += `> **Service:** ${item.service_type}  \n`;
+              body += `> **Next Due Date:** **${formatToDMY(item.next_due_date)}**  \n`;
+              body += `> **Tenant:** ${item.tenant_name || 'N/A'}  \n`;
+              body += `> **Last Service:** ${formatToDMY(item.last_service_date)}\n\n`;
             });
 
             body += `---\n\n`;
@@ -57,6 +67,6 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Maintenance Alert: ${dueItems.length} unit(s) due on ${targetStr}`,
+              title: `Maintenance Alert: ${dueItems.length} unit(s) due on ${targetDMY}`,
               body: body
             });
