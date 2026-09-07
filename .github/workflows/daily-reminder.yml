@@ -48,14 +48,17 @@ jobs:
 
             let body = `Attention: @${context.repo.owner}\n\n`;
             body += `## Maintenance Due in 7 Days (${targetDMY})\n\n`;
-            body += `**${dueItems.length} unit(s)** require service coordination:\n\n`;
+            body += `**${dueItems.length} unit(s)** require service coordination.\n\n`;
 
             dueItems.forEach((item, idx) => {
-              body += `> ### ${idx + 1}. ${item.building_name} — Unit ${item.unit_number}\n`;
-              body += `> * **Service:** ${item.service_type}\n`;
-              body += `> * **Next Due Date:** ${formatToDMY(item.next_due_date)}\n`;
-              body += `> * **Tenant:** ${item.tenant_name || 'N/A'}\n`;
-              body += `> * **Last Service Done:** ${formatToDMY(item.last_service_date)}\n\n`;
+              body += `### Property #${idx + 1}: ${item.building_name} — Unit ${item.unit_number}\n\n`;
+              body += `| Field | Detail |\n`;
+              body += `| :--- | :--- |\n`;
+              body += `| **Service Type** | ${item.service_type} |\n`;
+              body += `| **Next Due Date** | **${formatToDMY(item.next_due_date)}** |\n`;
+              body += `| **Tenant Name** | ${item.tenant_name || 'N/A'} |\n`;
+              body += `| **Last Service Done** | ${formatToDMY(item.last_service_date)} |\n\n`;
+              body += `---\n\n`;
             });
 
             body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)**\n`;
