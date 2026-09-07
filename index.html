@@ -88,7 +88,7 @@
           <div class="flex justify-between items-center mb-4">
             <div>
               <h2 class="font-semibold text-base text-slate-900">Active Service Schedules</h2>
-              <span class="text-xs text-slate-400">Services advance automatically to the next cycle upon completion</span>
+              <span class="text-xs text-slate-400">Services roll forward to the next cycle upon completion</span>
             </div>
             <span id="syncStatus" class="text-xs font-medium text-emerald-600">● Connected</span>
           </div>
@@ -119,7 +119,7 @@
           <div class="flex justify-between items-center mb-4">
             <div>
               <h2 class="font-semibold text-base text-slate-900">Completed Service Log</h2>
-              <span class="text-xs text-slate-400">History audit with next upcoming cycle record</span>
+              <span class="text-xs text-slate-400">Audit history with scheduled next due date</span>
             </div>
             <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-red-500">Clear</button>
           </div>
@@ -132,7 +132,7 @@
                   <th class="pb-2">Property</th>
                   <th class="pb-2">Service</th>
                   <th class="pb-2">Completed On</th>
-                  <th class="pb-2">Rolled Next Due</th>
+                  <th class="pb-2">Next Due</th>
                   <th class="pb-2 text-right">Action</th>
                 </tr>
               </thead>
@@ -254,70 +254,33 @@
 
     async function sendCompletionNotification(item, completedDate, newNextDueDate) {
       const token = getToken();
-      if (!token) {
-        alert("GitHub Token missing: cannot dispatch completion email.");
-        return;
-      }
-
-      const completedDMY = formatToDMY(completedDate);
-      const nextDueDMY = formatToDMY(newNextDueDate);
-
-      let body = `Attention: @ekodio\n\n`;
-      body += `## Service Completed Successfully\n\n`;
-      body += `<table width="100%" border="1" cellpadding="10" cellspacing="0">\n`;
-      body += `  <tbody>\n`;
-      body += `    <tr>\n`;
-      body += `      <td width="38%"><strong>Property / Flat</strong></td>\n`;
-      body += `      <td width="62%">${item.building_name} — Unit ${item.unit_number}</td>\n`;
-      body += `    </tr>\n`;
-      body += `    <tr>\n`;
-      body += `      <td width="38%"><strong>Service Done</strong></td>\n`;
-      body += `      <td width="62%">${item.service_type}</td>\n`;
-      body += `    </tr>\n`;
-      body += `    <tr>\n`;
-      body += `      <td width="38%"><strong>Tenant</strong></td>\n`;
-      body += `      <td width="62%">${item.tenant_name || 'N/A'}</td>\n`;
-      body += `    </tr>\n`;
-      body += `    <tr>\n`;
-      body += `      <td width="38%"><strong>Completed On</strong></td>\n`;
-      body += `      <td width="62%"><strong>${completedDMY}</strong></td>\n`;
-      body += `    </tr>\n`;
-      body += `    <tr>\n`;
-      body += `      <td width="38%"><strong>Next Scheduled Due</strong></td>\n`;
-      body += `      <td width="62%"><strong>${nextDueDMY}</strong> (${item.cycle_days || 90} days cycle)</td>\n`;
-      body += `    </tr>\n`;
-      body += `  </tbody>\n`;
-      body += `</table>\n\n`;
-      body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)**\n`;
+      if (!token) return;
 
       try {
-        const issueRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues`, {
+        const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/service-completed.yml/dispatches`, {
           method: 'POST',
-          headers: { 
-            Authorization: `token ${token}`, 
-            'Content-Type': 'application/json',
-            Accept: 'application/vnd.github.v3+json'
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            title: `Service Completed: ${item.service_type} — ${item.building_name} ${item.unit_number}`,
-            body: body
+            ref: 'main',
+            inputs: {
+              building_name: item.building_name,
+              unit_number: item.unit_number,
+              tenant_name: item.tenant_name || 'N/A',
+              service_type: item.service_type,
+              completed_date: completedDate,
+              next_due_date: newNextDueDate,
+              cycle_days: String(item.cycle_days || 90)
+            }
           })
         });
 
-        if (!issueRes.ok) {
-          const errData = await issueRes.json();
-          console.error("Issue creation error:", errData);
-          alert(`Email trigger error (${issueRes.status}): Ensure your GitHub Token has 'issues' permission.`);
-          return;
+        if (!res.ok) {
+          console.error('Completion dispatch failed:', await res.json());
         }
-
-        const issueData = await issueRes.json();
-        // Close immediately so it archives clean and dispatches the email
-        await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues/${issueData.number}`, {
-          method: 'PATCH',
-          headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state: 'closed' })
-        });
       } catch (err) {
         console.error('Notification dispatch error:', err);
       }
@@ -369,8 +332,8 @@
           <div>
             <div class="font-bold text-sm text-slate-900">${item.building_name} — ${item.unit_number}</div>
             <div class="text-xs text-slate-500 mt-0.5">${item.service_type} • ${item.tenant_name || 'N/A'}</div>
-            <div class="text-xs text-slate-400 mt-0.5">Last Done: ${formatToDMY(item.last_service_date)}</div>
-            <div class="text-xs font-semibold text-blue-600 mt-1">Next Due: ${formatToDMY(item.next_due_date)}</div>
+            <div class="text-xs text-slate-400 mt-0.5">Last: ${formatToDMY(item.last_service_date)}</div>
+            <div class="text-xs font-semibold text-blue-600 mt-1">Due: ${formatToDMY(item.next_due_date)}</div>
           </div>
           <div class="flex flex-col gap-1.5 items-end">
             <button onclick="markDone(${index})" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg font-medium shadow-sm">
@@ -442,14 +405,13 @@
       document.getElementById('addServiceForm').reset();
     });
 
-    // Mark Done: rolls recurring date forward and logs the completed cycle
     window.markDone = async function(index) {
       const item = state.schedules[index];
       const today = new Date().toISOString().split('T')[0];
       const cycle = parseInt(item.cycle_days, 10) || 90;
       const nextDue = addDaysToDate(today, cycle);
 
-      // Record to history audit log
+      // Record to history
       state.history.push({
         ...item,
         completed_date: today,
