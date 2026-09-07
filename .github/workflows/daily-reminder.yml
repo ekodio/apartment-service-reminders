@@ -52,12 +52,26 @@ jobs:
 
             dueItems.forEach((item, idx) => {
               body += `### Property #${idx + 1}: ${item.building_name} — Unit ${item.unit_number}\n\n`;
-              body += `| Field | Detail |\n`;
-              body += `| :--- | :--- |\n`;
-              body += `| **Service Type** | ${item.service_type} |\n`;
-              body += `| **Next Due Date** | **${formatToDMY(item.next_due_date)}** |\n`;
-              body += `| **Tenant Name** | ${item.tenant_name || 'N/A'} |\n`;
-              body += `| **Last Service Done** | ${formatToDMY(item.last_service_date)} |\n\n`;
+              body += `<table width="100%" border="1" cellpadding="10" cellspacing="0">\n`;
+              body += `  <tbody>\n`;
+              body += `    <tr>\n`;
+              body += `      <td width="38%"><strong>Service Type</strong></td>\n`;
+              body += `      <td width="62%">${item.service_type}</td>\n`;
+              body += `    </tr>\n`;
+              body += `    <tr>\n`;
+              body += `      <td width="38%"><strong>Next Due Date</strong></td>\n`;
+              body += `      <td width="62%"><strong>${formatToDMY(item.next_due_date)}</strong></td>\n`;
+              body += `    </tr>\n`;
+              body += `    <tr>\n`;
+              body += `      <td width="38%"><strong>Tenant Name</strong></td>\n`;
+              body += `      <td width="62%">${item.tenant_name || 'N/A'}</td>\n`;
+              body += `    </tr>\n`;
+              body += `    <tr>\n`;
+              body += `      <td width="38%"><strong>Last Service Done</strong></td>\n`;
+              body += `      <td width="62%">${formatToDMY(item.last_service_date)}</td>\n`;
+              body += `    </tr>\n`;
+              body += `  </tbody>\n`;
+              body += `</table>\n\n`;
               body += `---\n\n`;
             });
 
