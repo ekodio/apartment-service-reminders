@@ -13,7 +13,7 @@
     <header class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:justify-between md:items-center gap-4">
       <div>
         <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Apartment Maintenance</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Automated schedules and 7-day email reminders</p>
+        <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Automated schedules, alerts & completion notifications</p>
       </div>
       <div class="flex items-center gap-2">
         <input id="ghToken" type="password" placeholder="GitHub Access Token" class="text-xs p-2 border border-slate-300 rounded-lg w-full sm:w-56 focus:ring-2 focus:ring-slate-900 focus:outline-none">
@@ -86,11 +86,11 @@
         <!-- Active Schedules -->
         <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div class="flex justify-between items-center mb-4">
-            <h2 class="font-semibold text-base text-slate-900">Active Schedules</h2>
+            <h2 class="font-semibold text-base text-slate-900">Active Service Schedules</h2>
             <span id="syncStatus" class="text-xs font-medium text-emerald-600">● Connected</span>
           </div>
 
-          <!-- Desktop Table (visible on md+) -->
+          <!-- Desktop Table -->
           <div class="hidden md:block overflow-x-auto">
             <table class="w-full text-left text-sm">
               <thead>
@@ -106,7 +106,7 @@
             </table>
           </div>
 
-          <!-- Mobile Cards (visible below md) -->
+          <!-- Mobile Cards -->
           <div id="servicesListMobile" class="md:hidden space-y-3"></div>
         </div>
 
@@ -148,6 +148,12 @@
     const lastDateInput = document.getElementById('lastDate');
     const cycleInput = document.getElementById('cycleDays');
     const dueDateInput = document.getElementById('dueDate');
+
+    function formatToDMY(dStr) {
+      if (!dStr) return 'N/A';
+      const parts = dStr.split('-');
+      return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : dStr;
+    }
 
     function updateCalculatedDueDate() {
       if (!lastDateInput.value) return;
@@ -235,6 +241,68 @@
       }
     }
 
+    // Sends the completion email alert through GitHub Issues
+    async function sendCompletionNotification(item, completedDate) {
+      const token = getToken();
+      if (!token) return;
+
+      const completedDMY = formatToDMY(completedDate);
+      const nextDue = new Date(completedDate);
+      nextDue.setDate(nextDue.getDate() + (item.cycle_days || 90));
+      const nextDueDMY = formatToDMY(nextDue.toISOString().split('T')[0]);
+
+      let body = `Attention: @ekodio\n\n`;
+      body += `## Service Completed Successfully\n\n`;
+      body += `<table width="100%" border="1" cellpadding="10" cellspacing="0">\n`;
+      body += `  <tbody>\n`;
+      body += `    <tr>\n`;
+      body += `      <td width="38%"><strong>Property / Flat</strong></td>\n`;
+      body += `      <td width="62%">${item.building_name} — Unit ${item.unit_number}</td>\n`;
+      body += `    </tr>\n`;
+      body += `    <tr>\n`;
+      body += `      <td width="38%"><strong>Service Done</strong></td>\n`;
+      body += `      <td width="62%">${item.service_type}</td>\n`;
+      body += `    </tr>\n`;
+      body += `    <tr>\n`;
+      body += `      <td width="38%"><strong>Tenant</strong></td>\n`;
+      body += `      <td width="62%">${item.tenant_name || 'N/A'}</td>\n`;
+      body += `    </tr>\n`;
+      body += `    <tr>\n`;
+      body += `      <td width="38%"><strong>Completed Date</strong></td>\n`;
+      body += `      <td width="62%"><strong>${completedDMY}</strong></td>\n`;
+      body += `    </tr>\n`;
+      body += `    <tr>\n`;
+      body += `      <td width="38%"><strong>Next Scheduled Due</strong></td>\n`;
+      body += `      <td width="62%">${nextDueDMY} (${item.cycle_days || 90} days cycle)</td>\n`;
+      body += `    </tr>\n`;
+      body += `  </tbody>\n`;
+      body += `</table>\n\n`;
+      body += `👉 **[Open Maintenance Console](https://ekodio.github.io/apartment-service-reminders/)**\n`;
+
+      try {
+        const issueRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues`, {
+          method: 'POST',
+          headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `Service Completed: ${item.service_type} — ${item.building_name} ${item.unit_number}`,
+            body: body
+          })
+        });
+        const issueData = await issueRes.json();
+
+        // Immediately close the issue so it acts as an archive and triggers email without staying open
+        if (issueData.number) {
+          await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues/${issueData.number}`, {
+            method: 'PATCH',
+            headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: 'closed' })
+          });
+        }
+      } catch (err) {
+        console.error('Notification dispatch error:', err);
+      }
+    }
+
     function renderAll() {
       renderDesktopTable();
       renderMobileCards();
@@ -256,7 +324,7 @@
           </td>
           <td class="py-3 text-slate-700">${item.service_type}</td>
           <td class="py-3 text-xs text-slate-400">${item.cycle_days || 90}d</td>
-          <td class="py-3 font-semibold text-blue-600">${item.next_due_date}</td>
+          <td class="py-3 font-semibold text-blue-600">${formatToDMY(item.next_due_date)}</td>
           <td class="py-3 text-right space-x-1">
             <button onclick="markDone(${index})" class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-2.5 py-1 rounded-md font-medium hover:bg-emerald-100">
               ✓ Done
@@ -280,7 +348,7 @@
           <div>
             <div class="font-bold text-sm text-slate-900">${item.building_name} — ${item.unit_number}</div>
             <div class="text-xs text-slate-500 mt-0.5">${item.service_type} • ${item.tenant_name || 'N/A'}</div>
-            <div class="text-xs font-semibold text-blue-600 mt-1">Due: ${item.next_due_date}</div>
+            <div class="text-xs font-semibold text-blue-600 mt-1">Due: ${formatToDMY(item.next_due_date)}</div>
           </div>
           <div class="flex flex-col gap-1.5 items-end">
             <button onclick="markDone(${index})" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg font-medium shadow-sm">
@@ -304,7 +372,7 @@
         <tr class="hover:bg-slate-50">
           <td class="py-2.5 font-medium text-slate-800">${log.building_name} — ${log.unit_number}</td>
           <td class="py-2.5 text-slate-600">${log.service_type}</td>
-          <td class="py-2.5 font-semibold text-emerald-700">${log.completed_date}</td>
+          <td class="py-2.5 font-semibold text-emerald-700">${formatToDMY(log.completed_date)}</td>
           <td class="py-2.5 text-right">
             <button onclick="reopenService(${state.history.length - 1 - index})" class="text-xs text-slate-500 hover:text-slate-800 border px-2 py-0.5 rounded">
               ↩ Restore
@@ -324,7 +392,7 @@
         <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center text-xs">
           <div>
             <span class="font-semibold text-slate-900">${log.building_name} - ${log.unit_number}</span>
-            <span class="text-slate-500 block">${log.service_type} • ${log.completed_date}</span>
+            <span class="text-slate-500 block">${log.service_type} • ${formatToDMY(log.completed_date)}</span>
           </div>
           <button onclick="reopenService(${state.history.length - 1 - index})" class="text-slate-600 text-[11px] border bg-white px-2 py-1 rounded">
             Restore
@@ -352,12 +420,22 @@
 
     window.markDone = async function(index) {
       const item = state.schedules[index];
+      const today = new Date().toISOString().split('T')[0];
+
+      // Save to completed history
       state.history.push({
         ...item,
-        completed_date: new Date().toISOString().split('T')[0]
+        completed_date: today
       });
+
+      // Remove from active list
       state.schedules.splice(index, 1);
+
+      // Save to data.json
       await syncToGitHub();
+
+      // Trigger the completion email
+      await sendCompletionNotification(item, today);
     };
 
     window.reopenService = async function(historyIndex) {
